@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   FlatList,
   StyleSheet,
   Alert,
+  ActivityIndicator
 } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
@@ -27,40 +28,98 @@ export default function ProfessorScreen() {
   const [novoComunicado, setNovoComunicado] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
 
-  const salvarComunicado = () => {
+  // 🔥 Agora os dados da matéria e professor vêm da API
+  const [materiaTitulo, setMateriaTitulo] = useState("");
+  const [materiaSubtitulo, setMateriaSubtitulo] = useState("");
+  const [professorNome, setProfessorNome] = useState("");
+
+  const [loading, setLoading] = useState(true);
+
+  // 🔥 Buscar dados da API
+  useEffect(() => {
+    const carregarDados = async () => {
+      try {
+        const res = await fetch("http://ip:3000/professor/dados");
+        const data = await res.json();
+
+        setMateriaTitulo(data.materiaTitulo);
+        setMateriaSubtitulo(data.materiaSubtitulo);
+        setProfessorNome(data.professorNome);
+        setComunicados(data.comunicados);
+
+      } catch (error) {
+        Alert.alert("Erro", "Falha ao carregar dados da API");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, []);
+
+  // --- Criar ou editar comunicado ---
+  const salvarComunicado = async () => {
     if (novoComunicado.trim() === "") {
       Alert.alert("Erro", "O comunicado não pode estar vazio.");
       return;
     }
 
+    // ✏ Atualizar
     if (editId) {
-      setComunicados((prev) =>
-        prev.map((item) =>
-          item.id === editId
-            ? {
-                ...item,
-                preview: novoComunicado,
-                data: new Date().toLocaleString(),
-              }
-            : item
-        )
-      );
+      try {
+        await fetch(`http://ip:3000/comunicados/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ preview: novoComunicado }),
+        });
+
+        setComunicados((prev) =>
+          prev.map((item) =>
+            item.id === editId
+              ? { ...item, preview: novoComunicado, data: new Date().toISOString() }
+              : item
+          )
+        );
+      } catch {
+        Alert.alert("Erro", "Falha ao editar comunicado.");
+      }
+
       setEditId(null);
-    } else {
-      const newItem: Comunicado = {
-        id: (comunicados.length + 1).toString(),
-        professor: "Professor Claudio",
-        data: new Date().toLocaleString(),
-        preview: novoComunicado,
-      };
-      setComunicados([newItem, ...comunicados]);
+    } 
+    
+    // 🆕 Criar
+    else {
+      try {
+        const res = await fetch("http://SEU-IP:3000/comunicados", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            preview: novoComunicado,
+            professor: professorNome,
+          }),
+        });
+
+        const novo = await res.json();
+
+        setComunicados((prev) => [novo, ...prev]);
+
+      } catch {
+        Alert.alert("Erro", "Falha ao criar comunicado.");
+      }
     }
 
     setNovoComunicado("");
   };
 
-  const deletarComunicado = (id: string) => {
-    setComunicados((prev) => prev.filter((item) => item.id !== id));
+  // --- Deletar ---
+  const deletarComunicado = async (id: string) => {
+    try {
+      await fetch(`http://SEU-IP:3000/comunicados/${id}`, { method: "DELETE" });
+
+      setComunicados((prev) => prev.filter((item) => item.id !== id));
+    } catch {
+      Alert.alert("Erro", "Falha ao deletar comunicado.");
+    }
   };
 
   const editarComunicado = (item: Comunicado) => {
@@ -97,49 +156,54 @@ export default function ProfessorScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerText}>PAINEL DO PROFESSOR</Text>
-        <IconSymbol
-          name="person.circle.fill"
-          size={30}
-          color="#fff"
-          style={styles.profileIcon}
-        />
-      </View>
+      {loading ? (
+        <ActivityIndicator size={30} color={CLASSROOM_BLUE} style={{ marginTop: 50 }} />
+      ) : (
+        <>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerText}>PAINEL DO PROFESSOR</Text>
+            <IconSymbol
+              name="person.circle.fill"
+              size={30}
+              color="#fff"
+              style={styles.profileIcon}
+            />
+          </View>
 
-      {/* Caixa da matéria (igual ao aluno) */}
-      <View style={styles.materiaBox}>
-        <Text style={styles.materiaTitulo}>Cálculo 1</Text>
-        <Text style={styles.materiaSubtitulo}>FUCAPI - 2025/1</Text>
-      </View>
+          {/* Box da matéria -> agora dinâmico */}
+          <View style={styles.materiaBox}>
+            <Text style={styles.materiaTitulo}>{materiaTitulo}</Text>
+            <Text style={styles.materiaSubtitulo}>{materiaSubtitulo}</Text>
+          </View>
 
-      {/* Card de criação */}
-      <View style={styles.box}>
-        <Text style={styles.cursoText}>Criar comunicado</Text>
+          {/* Criar comunicado */}
+          <View style={styles.box}>
+            <Text style={styles.cursoText}>Criar comunicado</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Escreva um comunicado..."
-          value={novoComunicado}
-          onChangeText={setNovoComunicado}
-          multiline
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="Escreva um comunicado..."
+              value={novoComunicado}
+              onChangeText={setNovoComunicado}
+              multiline
+            />
 
-        <TouchableOpacity style={styles.button} onPress={salvarComunicado}>
-          <Text style={styles.buttonText}>
-            {editId ? "Salvar Alteração" : "Criar Comunicado"}
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={salvarComunicado}>
+              <Text style={styles.buttonText}>
+                {editId ? "Salvar Alteração" : "Criar Comunicado"}
+              </Text>
+            </TouchableOpacity>
 
-        {/* Lista */}
-        <FlatList
-          data={comunicados}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingTop: 10 }}
-        />
-      </View>
+            <FlatList
+              data={comunicados}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              contentContainerStyle={{ paddingTop: 10 }}
+            />
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -167,7 +231,6 @@ const styles = StyleSheet.create({
     top: 25,
   },
 
-  // --- Box da matéria (igual ao aluno) ---
   materiaBox: {
     backgroundColor: "#fff",
     marginHorizontal: 15,
@@ -193,7 +256,6 @@ const styles = StyleSheet.create({
     color: TEXT_GRAY,
   },
 
-  // --- Card de criação ---
   box: {
     backgroundColor: "#fff",
     marginHorizontal: 15,
@@ -234,7 +296,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // --- Card de comunicado ---
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -244,10 +305,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingRight: 10,
   },
+
   cardIndicator: {
     width: 6,
     backgroundColor: CLASSROOM_BLUE,
   },
+
   professor: { fontSize: 15, fontWeight: "700", color: TEXT_DARK },
   data: { fontSize: 12, color: TEXT_GRAY, marginBottom: 4 },
   preview: { fontSize: 14, color: TEXT_GRAY },

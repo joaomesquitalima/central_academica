@@ -1,35 +1,41 @@
 import React, { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-// Cor principal inspirada no Google Classroom
 const CLASSROOM_BLUE = "#1874CD";
 const TEXT_DARK = "#202124";
 const TEXT_GRAY = "#5f6368";
-const BG_LIGHT = "#f8f9fa"; // Cor de fundo mais clara
+const BG_LIGHT = "#f8f9fa"; 
 
+// Estrutura do comunicado vinda da API
 type Comunicado = {
   id: string;
-  professor: string;
-  data: string;
-  materia: string;
-  preview: string;
+  titulo: string;
+  conteudo: string;
+  dataPublicacao: string;
+  professorEmail: string;
 };
 
 export default function ComunicadosScreen() {
-  // const aluno = {
-  //   nome: "João Vitor Mesquita",
-  //   faltas: 24, // Assumindo que este é o percentual
-  //   limiteFaltas: 25, // Assumindo que este é o percentual
-  // }; 
 
+  
   const [aluno, setAluno] = useState({
-    nome: "João Vitor Mesquita",
+    nome: "Aluno PlaceHolder",
     faltas: 0,
     limiteFaltas: 0
   });
 
+  
+  const [comunicados, setComunicados] = useState<Comunicado[]>([]);
+
+  
+  const [turmaInfo, setTurmaInfo] = useState({
+    materia: "Carregando...",
+    periodo: "----/--"
+  });
+
+
   useEffect(() => {
-    fetch("http://192.168.15.2:5000/faltas") 
+    fetch("http://192.168.15.2:5000/faltas")
       .then(res => res.json())
       .then(data => {
         setAluno(prev => ({
@@ -41,90 +47,100 @@ export default function ComunicadosScreen() {
       .catch(err => console.error(err));
   }, []);
 
-  const comunicados: Comunicado[] = [
-    {
-      id: "1",
-      professor: "Professor Claudio",
-      data: "11 de Nov - 09:40",
-      materia: "Cálculo 1",
-      preview: "A aula de amanhã será substituída...",
-    },
-    {
-      id: "2",
-      professor: "Professor Claudio",
-      data: "10 de Nov - 15:20",
-      materia: "Cálculo 1",
-      preview: "Prova de recuperação disponível...",
-    },
-    {
-      id: "3",
-      professor: "Professor Claudio",
-      data: "09 de Nov - 12:10",
-      materia: "Cálculo 1",
-      preview: "Material atualizado no portal...",
-    },
-  ];
+  // Puxa comunicados da API 
+ useEffect(() => {
+  fetch("http://192.168.15.3:5000/comunicados/aluno")
+    .then(res => res.json())
+    .then(data => {
+      
+      setComunicados(data);
 
+    
+      if (data.turma) {
+        setTurmaInfo({
+          materia: data.turma.materia,
+          periodo: data.turma.periodo
+        });
+      }
+    })
+    .catch(err => console.error(err));
+}, []);
+
+
+  
   const renderItem = ({ item }: { item: Comunicado }) => (
-    // Card de Comunicado
-    <TouchableOpacity style={styles.card}>
-      {/* Indicador de cor lateral */}
-      <View style={styles.cardIndicator} />
-      <View style={styles.cardContent}>
-        <Text style={styles.professor}>{item.professor} - {item.materia}</Text>
-        <Text style={styles.data}>{item.data}</Text>
-        <Text style={styles.preview} numberOfLines={2}>{item.preview}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  <TouchableOpacity style={styles.card}>
+    <View style={styles.cardIndicator} />
+    <View style={styles.cardContent}>
+      <Text style={styles.professor}>
+        {item.titulo}
+      </Text>
+
+      <Text style={styles.data}>
+        {new Date(item.dataPublicacao).toLocaleString("pt-BR")}
+      </Text>
+
+      <Text style={styles.preview} numberOfLines={2}>
+        {item.conteudo}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
 
   return (
     <View style={styles.container}>
-      {/* Barra superior azul (Estilo Classroom) */}
+
       <View style={styles.header}>
         <Text style={styles.headerText}>COMUNICADOS</Text>
       </View>
 
-     {/* Bloco da matéria */}
-<View style={styles.materiaBox}>
-  <Text style={styles.materiaTitulo}>Cálculo 1</Text>
-  <Text style={styles.materiaSubtitulo}>FUCAPI - 2025/1</Text>
-</View>
-
-
+      {/* Bloco da matéria */}
+      <View style={styles.materiaBox}>
+        <Text style={styles.materiaTitulo}>{turmaInfo.materia}</Text>
+        <Text style={styles.materiaSubtitulo}>FUCAPI — {turmaInfo.periodo}</Text>
+      </View>
 
       <View style={styles.contentArea}>
-        {/* Card de Informações do Aluno (Simulando um item de aviso) */}
+
+        {/* Card do aluno */}
         <View style={styles.alunoCard}>
-          <Text style={styles.alunoNome}>👋 Bem-vindo, {aluno.nome}</Text>
+          <Text style={styles.alunoNome}>Bem-vindo, {aluno.nome}</Text>
           <View style={styles.alunoFaltasContainer}>
             <Text style={styles.alunoFaltas}>
-              Faltas: <Text style={aluno.faltas >= aluno.limiteFaltas * 0.9 ? styles.faltasRed : styles.faltasNormal}>
+              Faltas:{" "}
+              <Text
+                style={
+                  aluno.faltas >= aluno.limiteFaltas * 0.9
+                    ? styles.faltasRed
+                    : styles.faltasNormal
+                }
+              >
                 {aluno.faltas}%
-              </Text> de {aluno.limiteFaltas}% (Limite)
+              </Text>{" "}
+              de {aluno.limiteFaltas}% (Limite)
             </Text>
           </View>
         </View>
 
-        {/* Separador de seção (Estilo título de seção no Classroom) */}
         <Text style={styles.sectionTitle}>Avisos Recentes</Text>
 
-        {/* Lista de comunicados */}
         <FlatList
           data={comunicados}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.flatListContent}
         />
+
       </View>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG_LIGHT, // Cor de fundo mais clara
+    backgroundColor: BG_LIGHT, 
   },
   // --- Header ---
   header: {
