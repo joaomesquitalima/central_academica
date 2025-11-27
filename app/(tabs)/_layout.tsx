@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
@@ -7,10 +7,42 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
+// Estrutura de comunicado
+type Comunicado = {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  dataPublicacao: string;
+  professorEmail: string;
+};
+
+/**
+ * Função que busca a quantidade de comunicados no backend
+ */
+async function getQuantidadeComunicados(): Promise<number> {
+  try {
+    const response = await fetch("http://192.168.15.2:5000/comunicados/aluno");
+    const data: Comunicado[] = await response.json();
+    return data.length;
+  } catch (err) {
+    console.error("Erro ao buscar comunicados:", err);
+    return 0;
+  }
+}
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const [unreadComunicados, setUnreadComunicados] = useState(3);
+  const [unreadComunicados, setUnreadComunicados] = useState(0);
   const [unreadProfessor, setUnreadProfessor] = useState(0);
+
+  // Busca a quantidade de comunicados quando o componente monta
+  useEffect(() => {
+    async function fetchQuantidade() {
+      const quantidade = await getQuantidadeComunicados();
+      setUnreadComunicados(quantidade);
+    }
+    fetchQuantidade();
+  }, []);
 
   return (
     <Tabs
@@ -22,6 +54,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ href: null }} />
+
       <Tabs.Screen
         name="comunicados"
         options={{
